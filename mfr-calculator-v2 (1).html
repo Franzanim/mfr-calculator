@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>mFR Calculator v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d0f;
+    --surface: #111518;
+    --surface2: #181e22;
+    --border: #1e2a30;
+    --border2: #243038;
+    --accent: #00e5c3;
+    --accent2: #0097ff;
+    --warn: #ff6b35;
+    --ok: #00c97a;
+    --text: #e8f0f4;
+    --text2: #7a96a4;
+    --text3: #3d5560;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Instrument Serif', serif;
+    --sans: 'DM Sans', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: linear-gradient(rgba(0,229,195,0.025) 1px,transparent 1px), linear-gradient(90deg,rgba(0,229,195,0.025) 1px,transparent 1px);
+    background-size:40px 40px;
+  }
+  .app { position:relative; z-index:1; max-width:480px; margin:0 auto; padding:24px 16px 60px; }
+
+  /* HEADER */
+  header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border); }
+  .logo-block h1 { font-family:var(--mono); font-size:22px; font-weight:500; letter-spacing:-0.5px; color:var(--accent); }
+  .logo-block h1 span { color:var(--text2); font-weight:300; }
+  .logo-block p { font-size:11px; color:var(--text3); font-family:var(--mono); margin-top:4px; letter-spacing:0.5px; text-transform:uppercase; }
+  .version { font-family:var(--mono); font-size:10px; color:var(--accent2); background:rgba(0,151,255,0.07); border:1px solid rgba(0,151,255,0.2); padding:4px 8px; border-radius:4px; }
+
+  /* SECTION LABEL */
+  .section-label { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* UPLOAD */
+  .upload-zone { border:1.5px dashed var(--border2); border-radius:12px; padding:32px 20px; text-align:center; cursor:pointer; transition:all 0.25s; background:var(--surface); position:relative; overflow:hidden; margin-bottom:20px; }
+  .upload-zone::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,229,195,0.04) 0%,transparent 70%); pointer-events:none; }
+  .upload-zone:hover,.upload-zone.drag-over { border-color:var(--accent); background:#0d1a1e; }
+  .upload-icon { width:44px; height:44px; margin:0 auto 14px; border:1.5px solid var(--border2); border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--surface2); }
+  .upload-icon svg { opacity:0.6; }
+  .upload-title { font-size:14px; font-weight:500; color:var(--text); margin-bottom:6px; }
+  .upload-sub { font-size:12px; color:var(--text3); line-height:1.5; }
+  .upload-btn { display:inline-block; margin-top:14px; padding:8px 18px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; font-size:12px; font-family:var(--mono); color:var(--accent); cursor:pointer; transition:all 0.2s; }
+  .upload-btn:hover { background:rgba(0,229,195,0.08); border-color:var(--accent); }
+  #fileInput { display:none; }
+
+  /* IMAGE + CANVAS */
+  .image-container { position:relative; width:100%; display:none; border-radius:12px; overflow:hidden; background:#000; margin-bottom:16px; }
+  .image-container.visible { display:block; }
+  #previewCanvas { width:100%; display:block; cursor:crosshair; }
+  .canvas-toolbar { display:flex; gap:6px; padding:10px 12px; background:var(--surface2); border-top:1px solid var(--border); flex-wrap:wrap; }
+  .tool-btn { flex:1; min-width:60px; padding:7px 8px; border-radius:6px; border:1px solid var(--border2); background:var(--surface); color:var(--text2); font-size:11px; font-family:var(--mono); cursor:pointer; transition:all 0.2s; text-align:center; white-space:nowrap; }
+  .tool-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .tool-btn.active { background:rgba(0,229,195,0.1); border-color:var(--accent); color:var(--accent); }
+  .tool-btn.ai-btn { border-color:rgba(0,151,255,0.4); color:var(--accent2); background:rgba(0,151,255,0.06); }
+  .tool-btn.ai-btn:hover,.tool-btn.ai-btn.active { background:rgba(0,151,255,0.15); border-color:var(--accent2); }
+  .tool-btn.danger:hover { border-color:var(--warn); color:var(--warn); }
+  .measure-hint { font-size:11px; color:var(--text3); font-family:var(--mono); padding:8px 12px; background:var(--surface2); border-top:1px solid var(--border); min-height:32px; transition:color 0.2s; line-height:1.5; }
+  .measure-hint.active { color:var(--accent); }
+  .measure-hint.ai { color:var(--accent2); }
+
+  /* AI LOADING OVERLAY */
+  .ai-overlay { position:absolute; inset:0; background:rgba(10,13,15,0.85); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; z-index:10; }
+  .ai-overlay.visible { display:flex; }
+  .ai-spinner { width:36px; height:36px; border:2px solid var(--border2); border-top-color:var(--accent2); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .ai-overlay p { font-family:var(--mono); font-size:12px; color:var(--text2); text-align:center; line-height:1.6; }
+  .ai-overlay span { font-size:10px; color:var(--text3); }
+
+  /* CALIBRATION CARD */
+  .calib-card { background:var(--surface); border:1px solid rgba(0,151,255,0.25); border-radius:12px; overflow:hidden; margin-bottom:16px; }
+  .calib-header { padding:12px 16px; background:rgba(0,151,255,0.06); border-bottom:1px solid rgba(0,151,255,0.15); display:flex; align-items:center; gap:10px; }
+  .calib-header svg { color:var(--accent2); flex-shrink:0; }
+  .calib-header-text strong { display:block; font-size:13px; color:var(--text); margin-bottom:2px; }
+  .calib-header-text small { font-size:11px; color:var(--text3); font-family:var(--mono); }
+  .calib-body { padding:14px 16px; }
+  .calib-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .calib-select { flex:1; padding:8px 12px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; transition:border-color 0.2s; }
+  .calib-select:focus { border-color:var(--accent2); }
+  .calib-select option { background:var(--surface2); }
+  .calib-custom { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; padding:0 10px; }
+  .calib-custom input { width:60px; padding:8px 0; background:transparent; border:none; outline:none; font-family:var(--mono); font-size:13px; color:var(--text); text-align:right; }
+  .calib-custom span { font-size:11px; color:var(--text3); font-family:var(--mono); }
+  .calib-btn { padding:8px 14px; background:rgba(0,151,255,0.1); border:1px solid rgba(0,151,255,0.3); border-radius:6px; color:var(--accent2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+  .calib-btn:hover { background:rgba(0,151,255,0.2); }
+  .calib-btn.calib-ai-btn { display:flex; align-items:center; gap:6px; }
+  .calib-status { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:11px; font-family:var(--mono); }
+  .calib-status.ok { background:rgba(0,201,122,0.08); border:1px solid rgba(0,201,122,0.2); color:var(--ok); }
+  .calib-status.warn { background:rgba(255,107,53,0.08); border:1px solid rgba(255,107,53,0.2); color:var(--warn); }
+  .calib-status.info { background:rgba(0,151,255,0.08); border:1px solid rgba(0,151,255,0.2); color:var(--accent2); }
+  .calib-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; background:currentColor; }
+
+  /* PARAMS CARD */
+  .params-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  .params-header { padding:14px 16px; background:var(--surface2); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .params-header span { font-size:12px; font-family:var(--mono); color:var(--text2); }
+  .param-row { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); gap:12px; transition:background 0.2s; }
+  .param-row:last-child { border-bottom:none; }
+  .param-row:hover { background:var(--surface2); }
+  .param-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .param-label { flex:1; }
+  .param-label strong { display:block; font-size:13px; font-weight:500; color:var(--text); margin-bottom:2px; }
+  .param-label small { font-size:10px; color:var(--text3); font-family:var(--mono); }
+  .param-label .ai-tag { font-size:9px; color:var(--accent2); font-family:var(--mono); margin-left:4px; opacity:0.7; }
+  .param-input-wrap { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; padding:0 10px; transition:border-color 0.2s; }
+  .param-input-wrap:focus-within { border-color:var(--accent); }
+  .param-input-wrap.ai-filled { border-color:rgba(0,151,255,0.4); }
+  .param-input-wrap input { width:64px; padding:8px 0; background:transparent; border:none; outline:none; font-family:var(--mono); font-size:14px; font-weight:500; color:var(--text); text-align:right; }
+  .param-unit { font-size:11px; color:var(--text3); font-family:var(--mono); }
+
+  /* FORMULA */
+  .formula-toggle { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-top:1px solid var(--border); cursor:pointer; font-size:11px; font-family:var(--mono); color:var(--text3); transition:color 0.2s; }
+  .formula-toggle:hover { color:var(--text2); }
+  .formula-content { padding:14px 16px; border-top:1px solid var(--border); display:none; background:var(--surface2); }
+  .formula-content.open { display:block; }
+  .formula-eq { font-family:var(--mono); font-size:13px; color:var(--accent); text-align:center; margin-bottom:10px; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:6px; }
+  .formula-desc { font-size:11px; color:var(--text3); line-height:1.7; font-family:var(--mono); }
+  .formula-desc span { color:var(--text2); }
+
+  /* AI ANALYSIS CARD */
+  .ai-analysis-card { background:var(--surface); border:1px solid rgba(0,151,255,0.2); border-radius:12px; overflow:hidden; margin-bottom:16px; display:none; animation:fadeIn 0.3s ease; }
+  .ai-analysis-card.visible { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .ai-analysis-header { padding:12px 16px; background:rgba(0,151,255,0.06); border-bottom:1px solid rgba(0,151,255,0.15); display:flex; align-items:center; gap:8px; }
+  .ai-analysis-header span { font-size:12px; font-family:var(--mono); color:var(--accent2); }
+  .ai-analysis-body { padding:14px 16px; }
+  .ai-analysis-body p { font-size:12px; color:var(--text2); line-height:1.7; font-family:var(--mono); }
+  .ai-analysis-body .ai-finding { display:flex; gap:8px; margin-bottom:8px; }
+  .ai-finding-key { color:var(--accent2); min-width:90px; flex-shrink:0; }
+  .ai-finding-val { color:var(--text); }
+  .ai-confidence { display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:6px 12px; background:rgba(0,151,255,0.06); border:1px solid rgba(0,151,255,0.15); border-radius:6px; font-size:11px; font-family:var(--mono); color:var(--text3); }
+  .conf-bar { flex:1; height:4px; background:var(--border2); border-radius:2px; overflow:hidden; width:60px; }
+  .conf-fill { height:100%; background:var(--accent2); border-radius:2px; transition:width 0.5s ease; }
+
+  /* CALC BUTTON */
+  .calc-btn { width:100%; padding:16px; background:var(--accent); border:none; border-radius:10px; font-family:var(--mono); font-size:14px; font-weight:500; color:#0a0d0f; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; margin-bottom:20px; }
+  .calc-btn:hover { background:#00ffda; transform:translateY(-1px); }
+  .calc-btn:active { transform:translateY(0); }
+  .calc-btn:disabled { background:var(--border2); color:var(--text3); cursor:not-allowed; transform:none; }
+
+  /* RESULT */
+  .result-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; display:none; animation:slideUp 0.4s ease; }
+  .result-card.visible { display:block; }
+  @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .result-header { padding:14px 16px; background:var(--surface2); border-bottom:1px solid var(--border); }
+  .result-header span { font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; }
+  .result-main { padding:28px 20px; text-align:center; }
+  .result-value { font-family:var(--serif); font-size:72px; line-height:1; margin-bottom:8px; transition:color 0.3s; }
+  .result-label { font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:20px; color:var(--text3); }
+  .result-interpretation { display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:500; margin-bottom:8px; }
+  .interp-dot { width:7px; height:7px; border-radius:50%; }
+  .result-sub { font-size:12px; color:var(--text3); font-family:var(--mono); margin-top:6px; }
+  .gauge-wrap { padding:0 20px 20px; }
+  .gauge-bar { height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; margin-bottom:6px; position:relative; }
+  .gauge-fill { height:100%; border-radius:3px; transition:width 0.8s cubic-bezier(0.22,1,0.36,1); background:linear-gradient(90deg,var(--warn),#ffcc02,var(--ok)); }
+  .gauge-marker { position:absolute; top:-4px; width:14px; height:14px; border-radius:50%; border:2px solid var(--bg); transform:translateX(-50%); transition:left 0.8s cubic-bezier(0.22,1,0.36,1); }
+  .gauge-labels { display:flex; justify-content:space-between; font-size:10px; font-family:var(--mono); color:var(--text3); }
+  .cutoff-line { position:absolute; left:60%; top:-4px; width:2px; height:14px; background:var(--text3); opacity:0.4; }
+  .result-details { border-top:1px solid var(--border); padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .detail-item { text-align:center; }
+  .detail-value { font-family:var(--mono); font-size:15px; font-weight:500; color:var(--text); margin-bottom:3px; }
+  .detail-label { font-size:10px; color:var(--text3); font-family:var(--mono); }
+
+  /* STATUS */
+  .status-dot { width:6px; height:6px; border-radius:50%; background:var(--text3); display:inline-block; margin-right:6px; }
+  .status-dot.ok { background:var(--ok); box-shadow:0 0 6px var(--ok); }
+  .status-dot.ai { background:var(--accent2); box-shadow:0 0 6px var(--accent2); animation:pulse 1.5s ease infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* DISCLAIMER */
+  .disclaimer { margin-top:24px; padding:14px 16px; background:rgba(255,107,53,0.05); border:1px solid rgba(255,107,53,0.2); border-radius:8px; }
+  .disclaimer p { font-size:11px; color:var(--text3); line-height:1.6; font-family:var(--mono); }
+  .disclaimer strong { color:var(--warn); }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(60px); background:var(--surface2); border:1px solid var(--border2); color:var(--text); padding:10px 18px; border-radius:8px; font-size:12px; font-family:var(--mono); z-index:100; transition:transform 0.3s ease; white-space:nowrap; max-width:90vw; text-align:center; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+
+  /* API KEY */
+  .apikey-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px; }
+  .apikey-section label { display:block; font-size:10px; font-family:var(--mono); color:var(--text3); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+  .apikey-row { display:flex; gap:8px; }
+  .apikey-row input { flex:1; padding:9px 12px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:12px; outline:none; transition:border-color 0.2s; }
+  .apikey-row input:focus { border-color:var(--accent2); }
+  .apikey-row button { padding:9px 14px; background:rgba(0,151,255,0.1); border:1px solid rgba(0,151,255,0.3); border-radius:6px; color:var(--accent2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+  .apikey-row button:hover { background:rgba(0,151,255,0.2); }
+  .apikey-note { font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:8px; line-height:1.5; }
+  .local-warning { display:none; background:rgba(255,107,53,0.08); border:1px solid rgba(255,107,53,0.35); border-radius:10px; padding:14px 16px; margin-bottom:20px; }
+  .local-warning.visible { display:block; }
+  .local-warning strong { display:block; font-size:13px; color:var(--warn); margin-bottom:6px; }
+  .local-warning p { font-size:11px; color:var(--text2); font-family:var(--mono); line-height:1.7; }
+  .local-warning code { background:var(--surface2); padding:2px 6px; border-radius:3px; color:var(--accent); font-size:11px; }
+
+  /* SESSION CARDS */
+  .session-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:border-color 0.2s; }
+  .session-card:hover { border-color:var(--accent); }
+  .session-card.active-session { border-color:var(--accent); background:rgba(0,229,195,0.04); }
+  .session-thumb { width:48px; height:36px; object-fit:cover; border-radius:4px; background:#000; flex-shrink:0; }
+  .session-info { flex:1; }
+  .session-info strong { display:block; font-size:12px; font-family:var(--mono); color:var(--text); margin-bottom:2px; }
+  .session-info small { font-size:10px; color:var(--text3); font-family:var(--mono); }
+  .session-mfr { font-family:var(--mono); font-size:16px; font-weight:500; flex-shrink:0; }
+  .session-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:4px; transition:color 0.2s; }
+  .session-del:hover { color:var(--warn); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-block">
+      <h1>mFR<span>.calc</span></h1>
+      <p>Murray-based Flow Reserve · AI-powered QCA</p>
+    </div>
+    <div class="version">v2.0 · AI</div>
+  </header>
+
+  <!-- LOCAL FILE WARNING -->
+  <div class="local-warning" id="localWarning">
+    <strong>⚠ File aperto in locale (file://)</strong>
+    <p>
+      Il browser blocca le chiamate API quando il file è aperto direttamente dal disco.<br><br>
+      <strong>Soluzione rapida:</strong> carica il file su un hosting gratuito:<br>
+      → <code>netlify.com/drop</code> — trascina il file, ottieni un link HTTPS in 10 secondi<br>
+      → oppure usa l'estensione <code>Live Server</code> su VS Code
+    </p>
+  </div>
+
+  <!-- API KEY -->
+  <div class="section-label">Configurazione AI</div>
+  <div class="apikey-section">
+    <label>Anthropic API Key</label>
+    <div class="apikey-row">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off">
+      <button onclick="saveApiKey()">Salva</button>
+    </div>
+    <p class="apikey-note">Necessaria per segmentazione AI e calibrazione automatica. La chiave è salvata solo in memoria locale della sessione.</p>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="section-label">Immagine angiografica</div>
+  <div class="upload-zone" id="uploadZone">
+    <div class="upload-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+      </svg>
+    </div>
+    <div class="upload-title">Carica angiografia coronarica</div>
+    <div class="upload-sub">JPEG, PNG — proiezione singola con stenosi intermedia visibile</div>
+    <label class="upload-btn" for="fileInput">Seleziona file</label>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+
+  <!-- IMAGE + CANVAS -->
+  <div class="image-container" id="imageContainer">
+    <canvas id="previewCanvas"></canvas>
+    <!-- AI LOADING OVERLAY -->
+    <div class="ai-overlay" id="aiOverlay">
+      <div class="ai-spinner"></div>
+      <p id="aiOverlayText">Analisi AI in corso…<br>Segmentazione vaso coronarico</p>
+      <span>Claude Vision · modello claude-sonnet-4-20250514</span>
+    </div>
+    <div class="canvas-toolbar">
+      <button class="tool-btn ai-btn" id="btnAI" onclick="runAIAnalysis()">⬡ AI Auto</button>
+      <button class="tool-btn active" id="btnMLD" onclick="setMeasureMode('MLD')">MLD</button>
+      <button class="tool-btn" id="btnRD" onclick="setMeasureMode('RD')">RD</button>
+      <button class="tool-btn" id="btnL" onclick="setMeasureMode('L')">Lung.</button>
+      <button class="tool-btn danger" onclick="resetAll()">Reset</button>
+    </div>
+    <div class="canvas-toolbar" style="border-top:none; padding-top:0; gap:6px;">
+      <button class="tool-btn" id="btnCAL" onclick="runManualCalib()" style="flex:1.5">📏 Calibra catetere</button>
+      <button class="tool-btn" style="flex:1; border-color:rgba(0,229,195,0.3); color:var(--accent)" onclick="newAngio()">＋ Nuova coronarografia</button>
+    </div>
+    <div class="measure-hint" id="measureHint">Premi ⬡ AI Auto per analisi automatica, oppure traccia le misure manualmente</div>
+  </div>
+
+  <!-- SESSIONI MULTI-VASO -->
+  <div id="sessionList" style="margin-bottom:16px;display:none">
+    <div class="section-label">Sessioni salvate</div>
+    <div id="sessionItems"></div>
+  </div>
+
+  <!-- CALIBRAZIONE -->
+  <div class="section-label">Calibrazione metrica</div>
+  <div class="calib-card">
+    <div class="calib-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+      <div class="calib-header-text">
+        <strong>Catetere guida</strong>
+        <small>Riferimento metrico per conversione px → mm</small>
+      </div>
+    </div>
+    <div class="calib-body">
+      <div class="calib-row">
+        <select class="calib-select" id="cathSelect" onchange="onCathChange()">
+          <option value="">— Seleziona catetere —</option>
+          <option value="5">5 Fr = 1.67 mm</option>
+          <option value="6">6 Fr = 2.00 mm</option>
+          <option value="7">7 Fr = 2.33 mm</option>
+          <option value="8">8 Fr = 2.67 mm</option>
+          <option value="custom">Diametro personalizzato</option>
+        </select>
+      </div>
+      <div class="calib-row" id="customCathRow" style="display:none">
+        <div class="calib-custom">
+          <input type="number" id="customCathInput" placeholder="2.00" step="0.01" min="1" max="4" oninput="onCathChange()">
+          <span>mm</span>
+        </div>
+      </div>
+      <div class="calib-row" style="gap:8px; flex-wrap:wrap;">
+        <button class="calib-btn calib-ai-btn" onclick="runCalibrationAI()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          Rileva catetere AI
+        </button>
+        <button class="calib-btn" onclick="runManualCalib()" id="btnManualCalib" style="display:none">Traccia manualmente</button>
+      </div>
+      <div class="calib-status info" id="calibStatus">
+        <div class="calib-dot"></div>
+        <span>Nessuna calibrazione attiva — misure in px relativi</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI ANALYSIS RESULT -->
+  <div class="ai-analysis-card" id="aiAnalysisCard">
+    <div class="ai-analysis-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      <span>Analisi AI completata</span>
+    </div>
+    <div class="ai-analysis-body" id="aiAnalysisBody"></div>
+  </div>
+
+  <!-- PARAMS -->
+  <div class="section-label">Parametri QCA</div>
+  <div class="params-card">
+    <div class="params-header">
+      <span>Input valori</span>
+      <span><span class="status-dot" id="statusDot"></span><span id="statusText">In attesa</span></span>
+    </div>
+    <div class="param-row">
+      <div class="param-dot" style="background:#ff6b35"></div>
+      <div class="param-label">
+        <strong>MLD <span class="ai-tag" id="mldTag"></span></strong>
+        <small>Minimum Lumen Diameter</small>
+      </div>
+      <div class="param-input-wrap" id="mldWrap">
+        <input type="number" id="mldInput" placeholder="0.00" step="0.01" min="0.1" max="5" oninput="onParamChange()">
+        <span class="param-unit">mm</span>
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-dot" style="background:#0097ff"></div>
+      <div class="param-label">
+        <strong>RD <span class="ai-tag" id="rdTag"></span></strong>
+        <small>Reference Diameter (prossimale)</small>
+      </div>
+      <div class="param-input-wrap" id="rdWrap">
+        <input type="number" id="rdInput" placeholder="0.00" step="0.01" min="0.5" max="6" oninput="onParamChange()">
+        <span class="param-unit">mm</span>
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-dot" style="background:#00e5c3"></div>
+      <div class="param-label">
+        <strong>L <span class="ai-tag" id="lTag"></span></strong>
+        <small>Lunghezza stenosi</small>
+      </div>
+      <div class="param-input-wrap" id="lWrap">
+        <input type="number" id="lInput" placeholder="0.0" step="0.1" min="1" max="60" oninput="onParamChange()">
+        <span class="param-unit">mm</span>
+      </div>
+    </div>
+    <div class="formula-toggle" onclick="toggleFormula()">
+      <span>Formula Tu et al. (JACC 2012)</span>
+      <span id="formulaArrow">▸</span>
+    </div>
+    <div class="formula-content" id="formulaContent">
+      <div class="formula-eq">mFR = (MLD / RD)² × 1 / (1 + 0.5 × L / RD)</div>
+      <div class="formula-desc">
+        <span>MLD</span> = diametro minimo del lume alla stenosi (mm)<br>
+        <span>RD</span> = diametro di riferimento del vaso sano prossimale (mm)<br>
+        <span>L</span> = lunghezza assiale della stenosi (mm)<br><br>
+        Cut-off validato: <span>≤ 0.80</span> → ischemia funzionale significativa
+      </div>
+    </div>
+  </div>
+
+  <button class="calc-btn" id="calcBtn" onclick="calculateMFR()" disabled>CALCOLA mFR</button>
+
+  <!-- RESULT -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header"><span>Risultato · mFR</span></div>
+    <div class="result-main">
+      <div class="result-value" id="resultValue">—</div>
+      <div class="result-label">Murray-based Flow Reserve</div>
+      <div class="result-interpretation" id="resultInterp">
+        <div class="interp-dot" id="interpDot"></div>
+        <span id="interpText">—</span>
+      </div>
+      <div class="result-sub" id="resultSub"></div>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-bar">
+        <div class="gauge-fill" id="gaugeFill" style="width:0%"></div>
+        <div class="gauge-marker" id="gaugeMarker" style="left:0%;background:var(--text3)"></div>
+        <div class="cutoff-line"></div>
+      </div>
+      <div class="gauge-labels"><span>0.50</span><span>cut-off 0.80</span><span>1.00</span></div>
+    </div>
+    <div class="result-details">
+      <div class="detail-item"><div class="detail-value" id="detailDS">—</div><div class="detail-label">DS%</div></div>
+      <div class="detail-item"><div class="detail-value" id="detailAS">—</div><div class="detail-label">Area Stenosi</div></div>
+      <div class="detail-item"><div class="detail-value" id="detailClass">—</div><div class="detail-label">Classe</div></div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <p><strong>⚠ Solo uso di ricerca.</strong> Prototipo sperimentale per valutazione accademica. La segmentazione AI non è validata clinicamente. Non utilizzare per decisioni diagnostiche o terapeutiche. I valori prodotti devono essere sempre verificati con sistemi QCA certificati (QAngio XA, HeartFlow, ecc.).</p>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let canvas, ctx, img, imgBase64;
+let measureMode = null;
+let isDrawing = false, startPt = null;
+let measurements = { MLD:null, RD:null, L:null };
+let pixelsPerMm = null;
+let cathDiameterMm = null;
+let apiKey = '';
+let calibrationMode = false;
+let calibPoints = null;
+let sessions = [];
+let currentSessionId = null;
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  canvas = document.getElementById('previewCanvas');
+  ctx = canvas.getContext('2d');
+
+  // Detect file:// protocol and warn
+  if (window.location.protocol === 'file:') {
+    document.getElementById('localWarning').classList.add('visible');
+  }
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]); });
+  zone.addEventListener('click', e => { if(e.target.tagName!=='LABEL'&&e.target.tagName!=='INPUT') document.getElementById('fileInput').click(); });
+  document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) loadImage(e.target.files[0]); });
+  canvas.addEventListener('mousedown', onCanvasDown);
+  canvas.addEventListener('mousemove', onCanvasMove);
+  canvas.addEventListener('mouseup', onCanvasUp);
+  canvas.addEventListener('touchstart', e=>onCanvasDown(toMouse(e)), {passive:false});
+  canvas.addEventListener('touchmove', e=>{e.preventDefault();onCanvasMove(toMouse(e));}, {passive:false});
+  canvas.addEventListener('touchend', e=>onCanvasUp(toMouse(e)), {passive:false});
+});
+
+// ═══════════════════════════════════════════════
+// API KEY
+// ═══════════════════════════════════════════════
+function saveApiKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k.startsWith('sk-ant-')) { showToast('Formato chiave non valido'); return; }
+  apiKey = k;
+  showToast('✓ API Key salvata');
+}
+
+// ═══════════════════════════════════════════════
+// IMAGE LOAD
+// ═══════════════════════════════════════════════
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgBase64 = e.target.result.split(',')[1];
+    img = new Image();
+    img.onload = () => {
+      const maxW = canvas.parentElement.offsetWidth;
+      const scale = maxW / img.width;
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('imageContainer').classList.add('visible');
+      document.getElementById('btnManualCalib').style.display = 'inline-flex';
+      showToast('Immagine caricata — premi ⬡ AI Auto');
+      updateHint('Immagine caricata. Premi ⬡ AI Auto per analisi automatica', 'ai');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════
+// CALIBRATION — CATHETER SELECT
+// ═══════════════════════════════════════════════
+const FR_TO_MM = { '5':1.667, '6':2.000, '7':2.333, '8':2.667 };
+
+function onCathChange() {
+  const sel = document.getElementById('cathSelect').value;
+  document.getElementById('customCathRow').style.display = (sel === 'custom') ? 'flex' : 'none';
+  if (sel && sel !== 'custom') {
+    cathDiameterMm = FR_TO_MM[sel];
+    setCalibStatus('info', `Catetere ${sel} Fr selezionato (${cathDiameterMm.toFixed(3)} mm) — traccia il catetere per calibrare`);
+  } else if (sel === 'custom') {
+    const v = parseFloat(document.getElementById('customCathInput').value);
+    if (v > 0) { cathDiameterMm = v; setCalibStatus('info', `Diametro personalizzato ${v} mm — traccia il catetere per calibrare`); }
+  }
+}
+
+function runManualCalib() {
+  if (!img) { showToast('Carica prima un\'immagine'); return; }
+  if (!cathDiameterMm) { showToast('Seleziona prima il diametro del catetere'); return; }
+  calibrationMode = true;
+  calibPoints = null;
+  updateHint('📏 Traccia il diametro del catetere guida sull\'immagine per calibrare', 'active');
+  showToast('Traccia il diametro esterno del catetere');
+}
+
+// ═══════════════════════════════════════════════
+// CALIBRATION — AI AUTO DETECT
+// ═══════════════════════════════════════════════
+async function runCalibrationAI() {
+  if (!imgBase64) { showToast('Carica prima un\'immagine'); return; }
+  if (!apiKey) { showToast('Inserisci prima la API Key'); return; }
+  if (!cathDiameterMm) { showToast('Seleziona il tipo di catetere'); return; }
+
+  setCalibStatus('info', 'AI in rilevamento catetere…');
+  showAIOverlay('Rilevamento catetere guida…\nAnalisi struttura radio-opaca');
+
+  const prompt = `Sei un esperto di angiografia coronarica. Analizza questa immagine angiografica.
+
+Il catetere guida presente nell'immagine ha un diametro esterno noto di ${cathDiameterMm.toFixed(3)} mm.
+
+Rispondi SOLO con JSON valido, nessun testo aggiuntivo:
+{
+  "catheter_detected": true/false,
+  "catheter_width_px": <stima larghezza catetere in pixel nell'immagine>,
+  "catheter_location": "<descrizione posizione, es: ingresso sinistro, zona ostio>",
+  "image_quality": "<buona|discreta|scarsa>",
+  "notes": "<osservazioni brevi>"
+}
+
+L'immagine canvas ha dimensioni ${canvas.width}x${canvas.height} pixel (già scalata per la visualizzazione).`;
+
+  try {
+    const res = await callClaudeAPI(prompt, 'image/jpeg');
+    const data = parseJSON(res);
+    hideAIOverlay();
+
+    if (data.catheter_detected && data.catheter_width_px > 0) {
+      pixelsPerMm = data.catheter_width_px / cathDiameterMm;
+      setCalibStatus('ok', `✓ Catetere rilevato (${data.catheter_width_px}px = ${cathDiameterMm}mm) → ${pixelsPerMm.toFixed(1)} px/mm`);
+      updateMeasureInputs();
+      showToast(`Calibrazione AI completata: ${pixelsPerMm.toFixed(1)} px/mm`);
+    } else {
+      setCalibStatus('warn', `Catetere non rilevato con certezza — usa calibrazione manuale`);
+      showToast('Catetere non rilevato — prova manualmente');
+    }
+  } catch(e) {
+    hideAIOverlay();
+    setCalibStatus('warn', 'Errore API: ' + e.message);
+    showToast('Errore: ' + e.message);
+  }
+}
+
+function applyManualCalib(pxLen) {
+  if (!cathDiameterMm || pxLen <= 0) return;
+  pixelsPerMm = pxLen / cathDiameterMm;
+  setCalibStatus('ok', `✓ Calibrazione manuale: ${pixelsPerMm.toFixed(1)} px/mm (${cathDiameterMm} mm = ${pxLen.toFixed(0)} px)`);
+  updateMeasureInputs();
+  showToast(`Calibrazione: ${pixelsPerMm.toFixed(1)} px/mm`);
+  calibrationMode = false;
+  setMeasureMode('MLD');
+}
+
+// ═══════════════════════════════════════════════
+// AI SEGMENTATION + QCA
+// ═══════════════════════════════════════════════
+async function runAIAnalysis() {
+  if (!imgBase64) { showToast('Carica prima un\'immagine'); return; }
+  if (!apiKey) { showToast('Inserisci prima la API Key Anthropic'); return; }
+
+  document.getElementById('btnAI').classList.add('active');
+  showAIOverlay('Segmentazione vaso coronarico…\nIdentificazione stenosi intermedia');
+  updateHint('⬡ Analisi AI in corso — attendere…', 'ai');
+
+  const calibInfo = pixelsPerMm
+    ? `Calibrazione disponibile: ${pixelsPerMm.toFixed(2)} px/mm. Usa questo valore per convertire i pixel in mm.`
+    : `Calibrazione non disponibile. Stima i valori in mm basandoti su range tipici coronarici (RD tipico 2.0–4.0mm, MLD stenosi intermedie 1.0–2.5mm, lunghezza 5–30mm).`;
+
+  const prompt = `Sei un esperto cardiologo interventista con esperienza in angiografia coronarica e QCA (Quantitative Coronary Analysis). Stai analizzando un'immagine angiografica coronarica.
+
+STEP 1 — IDENTIFICAZIONE VASO (obbligatorio, priorità massima):
+Analizza attentamente la morfologia del vaso e la proiezione angiografica per identificare di quale coronaria si tratta:
+- Coronaria Destra (CDx / RCA): decorso verso destra, forma ad "L" o "C", irrora il ventricolo destro e la parete inferiore del VS, termina con la PDA (arteria discendente posteriore)
+- Arteria Discendente Anteriore (IVA / LAD): decorso verso il basso lungo il setto interventricolare, rami settali e diagonali
+- Arteria Circonflessa (Cx / LCx): decorso nel solco atrioventricolare sinistro, rami marginali ottusi
+- Tronco comune (TC / LMCA): breve segmento che si biforca in IVA e Cx
+Sii esplicito: se vedi una coronaria destra con decorso verso destra e PDA, scrivilo chiaramente. NON confondere CDx con IVA.
+
+STEP 2 — QCA VISIVA:
+${calibInfo}
+Identifica la stenosi intermedia (40-70% DS) e stima i parametri QCA.
+
+Rispondi SOLO con JSON valido, nessun testo aggiuntivo:
+{
+  "vessel_identified": "<CDx|IVA|Cx|TC — usa la nomenclatura italiana>",
+  "vessel_territory": "<territorio irrorato, es: inferiore/posteriore per CDx, anteriore/settale per IVA>",
+  "vessel_confidence": <0.0-1.0, confidenza nell'identificazione del vaso>,
+  "stenosis_location": "<segmento anatomico preciso, es: CDx prossimale, IVA media>",
+  "stenosis_severity_visual_pct": <stima DS% visiva, numero intero 40-70>,
+  "MLD_mm": <diametro minimo lume in mm, float 2 decimali>,
+  "RD_mm": <diametro riferimento prossimale in mm, float 2 decimali>,
+  "lesion_length_mm": <lunghezza stenosi in mm, float 1 decimale>,
+  "lesion_morphology": "<concentric|eccentric|calcified|soft|mixed>",
+  "image_quality": "<buona|discreta|scarsa>",
+  "confidence": <0.0-1.0, confidenza QCA complessiva>,
+  "notes": "<max 2 frasi: osservazioni cliniche + avvertenze sulla qualità dell'analisi AI>"
+}`;
+
+  try {
+    const res = await callClaudeAPI(prompt, 'image/jpeg');
+    const data = parseJSON(res);
+    hideAIOverlay();
+
+    displayAIAnalysis(data);
+    populateFromAI(data);
+    document.getElementById('btnAI').classList.remove('active');
+    updateHint('✓ Analisi AI completata — VERIFICA il vaso identificato prima di calcolare', '');
+  } catch(e) {
+    hideAIOverlay();
+    document.getElementById('btnAI').classList.remove('active');
+    showToast('Errore AI: ' + e.message);
+    updateHint('Errore nell\'analisi AI — controlla la API Key e riprova', '');
+  }
+}
+
+function displayAIAnalysis(data) {
+  const card = document.getElementById('aiAnalysisCard');
+  const body = document.getElementById('aiAnalysisBody');
+  card.classList.add('visible');
+
+  const conf = Math.round((data.confidence || 0.7) * 100);
+  const vconf = Math.round((data.vessel_confidence || 0.6) * 100);
+  const confColor = conf >= 75 ? '#00c97a' : conf >= 55 ? '#ffcc02' : '#ff6b35';
+  const vconfColor = vconf >= 80 ? '#00c97a' : vconf >= 60 ? '#ffcc02' : '#ff6b35';
+
+  body.innerHTML = `
+    <div class="ai-finding" style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+      <span class="ai-finding-key">Vaso:</span>
+      <span class="ai-finding-val" style="font-weight:500">${data.vessel_identified || 'N/D'}
+        <span style="font-size:10px;color:${vconfColor};margin-left:6px;font-family:var(--mono)">confidenza ${vconf}%</span>
+      </span>
+    </div>
+    <div class="ai-finding"><span class="ai-finding-key">Territorio:</span><span class="ai-finding-val">${data.vessel_territory || 'N/D'}</span></div>
+    <div class="ai-finding"><span class="ai-finding-key">Stenosi:</span><span class="ai-finding-val">${data.stenosis_location || 'N/D'}</span></div>
+    <div class="ai-finding"><span class="ai-finding-key">DS% visivo:</span><span class="ai-finding-val">${data.stenosis_severity_visual_pct || '—'}%</span></div>
+    <div class="ai-finding"><span class="ai-finding-key">Morfologia:</span><span class="ai-finding-val">${data.lesion_morphology || 'N/D'}</span></div>
+    <div class="ai-finding"><span class="ai-finding-key">Qualità img:</span><span class="ai-finding-val">${data.image_quality || 'N/D'}</span></div>
+    ${data.notes ? `<div class="ai-finding"><span class="ai-finding-key">Note:</span><span class="ai-finding-val">${data.notes}</span></div>` : ''}
+    <div style="margin-top:10px;padding:8px 10px;background:rgba(255,204,2,0.07);border:1px solid rgba(255,204,2,0.2);border-radius:6px;font-size:10px;font-family:var(--mono);color:#ffcc02;line-height:1.6;">
+      ⚠ Verifica sempre l'identificazione del vaso — l'AI non ha training specifico su angiografie coronariche
+    </div>
+    <div class="ai-confidence" style="margin-top:8px">
+      <span>Confidenza QCA</span>
+      <div class="conf-bar"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div>
+      <span style="color:${confColor}">${conf}%</span>
+    </div>
+  `;
+}
+
+function populateFromAI(data) {
+  const fields = [
+    { id:'mldInput', wrap:'mldWrap', tag:'mldTag', val:data.MLD_mm, key:'MLD' },
+    { id:'rdInput',  wrap:'rdWrap',  tag:'rdTag',  val:data.RD_mm,  key:'RD' },
+    { id:'lInput',   wrap:'lWrap',   tag:'lTag',   val:data.lesion_length_mm, key:'L' },
+  ];
+  fields.forEach(f => {
+    if (f.val) {
+      document.getElementById(f.id).value = f.val;
+      document.getElementById(f.wrap).classList.add('ai-filled');
+      document.getElementById(f.tag).textContent = '· AI';
+    }
+  });
+  onParamChange();
+
+  // Draw AI overlay on canvas
+  drawAIOverlayOnCanvas(data);
+}
+
+function drawAIOverlayOnCanvas(data) {
+  if (!img) return;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Draw an illustrative stenosis marker at center
+  const cx = canvas.width * 0.5;
+  const cy = canvas.height * 0.5;
+
+  ctx.save();
+  // Pulsing ring
+  ctx.strokeStyle = 'rgba(0,151,255,0.8)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, 28, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Label
+  ctx.setLineDash([]);
+  ctx.font = 'bold 11px DM Mono, monospace';
+  ctx.fillStyle = '#0097ff';
+  ctx.fillText(`${data.vessel_identified || 'Stenosi'}`, cx - 28, cy - 36);
+  ctx.fillStyle = 'rgba(0,151,255,0.5)';
+  ctx.font = '10px DM Mono, monospace';
+  ctx.fillText(`DS: ${data.stenosis_severity_visual_pct || '—'}%`, cx - 18, cy - 22);
+
+  // MLD indicator (horizontal line)
+  if (data.MLD_mm && pixelsPerMm) {
+    const halfMLD = (data.MLD_mm * pixelsPerMm) / 2;
+    ctx.strokeStyle = '#ff6b35';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.shadowColor = '#ff6b35';
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.moveTo(cx - halfMLD, cy);
+    ctx.lineTo(cx + halfMLD, cy);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ff6b35';
+    ctx.font = '10px DM Mono, monospace';
+    ctx.fillText(`MLD ${data.MLD_mm}mm`, cx + halfMLD + 4, cy + 4);
+  }
+
+  // RD indicator
+  if (data.RD_mm && pixelsPerMm) {
+    const halfRD = (data.RD_mm * pixelsPerMm) / 2;
+    const rdY = cy - 40;
+    ctx.strokeStyle = '#0097ff';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#0097ff';
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.moveTo(cx - halfRD, rdY);
+    ctx.lineTo(cx + halfRD, rdY);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0097ff';
+    ctx.fillText(`RD ${data.RD_mm}mm`, cx + halfRD + 4, rdY + 4);
+  }
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+// CLAUDE API CALL
+// ═══════════════════════════════════════════════
+async function callClaudeAPI(prompt, mediaType) {
+  if (!apiKey) throw new Error('API Key non impostata');
+
+  const body = {
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1000,
+    messages: [{
+      role: 'user',
+      content: [
+        { type:'image', source:{ type:'base64', media_type:mediaType, data:imgBase64 } },
+        { type:'text', text:prompt }
+      ]
+    }]
+  };
+
+  let res;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch(networkErr) {
+    // CORS or network error — likely opened as file://
+    throw new Error(
+      'Errore di rete. Se stai aprendo il file direttamente (file://), ' +
+      'caricalo su un server web o usa l\'estensione Live Server di VS Code.'
+    );
+  }
+
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const err = await res.json();
+      errMsg = err.error?.message || errMsg;
+    } catch(_) {}
+    throw new Error(errMsg);
+  }
+
+  const data = await res.json();
+  return data.content.map(b => b.text || '').join('');
+}
+
+function parseJSON(text) {
+  const clean = text.replace(/```json|```/g, '').trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Risposta AI non in formato JSON');
+  return JSON.parse(match[0]);
+}
+
+// ═══════════════════════════════════════════════
+// CANVAS INTERACTION
+// ═══════════════════════════════════════════════
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function toMouse(e) {
+  const t = e.touches ? e.touches[0]||e.changedTouches[0] : e;
+  return { clientX:t.clientX, clientY:t.clientY, preventDefault:()=>e.preventDefault() };
+}
+
+function onCanvasDown(e) {
+  if (!measureMode && !calibrationMode) return;
+  if (e.preventDefault) e.preventDefault();
+  isDrawing = true;
+  startPt = getPos(e);
+}
+
+function onCanvasMove(e) {
+  if (!isDrawing || !startPt) return;
+  const pt = getPos(e);
+  redrawAll();
+  const color = calibrationMode ? '#ffffff' : null;
+  drawLine(startPt, pt, calibrationMode ? 'CAL' : measureMode, true, color);
+}
+
+function onCanvasUp(e) {
+  if (!isDrawing || !startPt) return;
+  isDrawing = false;
+  const endPt = getPos(e);
+  const pxLen = Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y);
+
+  if (calibrationMode) {
+    redrawAll();
+    drawLine(startPt, endPt, 'CAL', false, '#ffffff');
+    applyManualCalib(pxLen);
+  } else if (measureMode) {
+    measurements[measureMode] = { start:startPt, end:endPt, pxLen };
+    redrawAll();
+    updateMeasureInputs();
+    advanceMeasureMode();
+  }
+  startPt = null;
+}
+
+function redrawAll() {
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const colors = { MLD:'#ff6b35', RD:'#0097ff', L:'#00e5c3' };
+  for (const [k,m] of Object.entries(measurements)) {
+    if (m) drawLine(m.start, m.end, k, false, colors[k]);
+  }
+}
+
+function drawLine(a, b, label, preview, color) {
+  const colors = { MLD:'#ff6b35', RD:'#0097ff', L:'#00e5c3', CAL:'#ffffff' };
+  const c = color || colors[label];
+  ctx.save();
+  ctx.strokeStyle = c;
+  ctx.lineWidth = preview ? 1.5 : 2;
+  ctx.setLineDash(preview ? [4,3] : []);
+  ctx.shadowColor = c; ctx.shadowBlur = preview ? 0 : 6;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  [a,b].forEach(pt => { ctx.beginPath(); ctx.arc(pt.x,pt.y,preview?3:4,0,Math.PI*2); ctx.fillStyle=c; ctx.fill(); });
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2-10;
+  ctx.font='11px DM Mono,monospace'; ctx.fillStyle=c; ctx.shadowBlur=0;
+  const pxLen = Math.hypot(b.x-a.x,b.y-a.y);
+  const mmLabel = pixelsPerMm ? ` (${(pxLen/pixelsPerMm).toFixed(2)}mm)` : '';
+  ctx.fillText(label + mmLabel, mx+4, my);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+// MEASURE MODE
+// ═══════════════════════════════════════════════
+function setMeasureMode(mode) {
+  calibrationMode = false;
+  measureMode = mode;
+  ['MLD','RD','L'].forEach(m => document.getElementById('btn'+m).classList.toggle('active', m===mode));
+  const hints = {
+    MLD:'🔴 Traccia il diametro minimo del lume alla stenosi',
+    RD:'🔵 Traccia il diametro del vaso sano di riferimento (prossimale)',
+    L:'🟢 Traccia la lunghezza assiale della stenosi'
+  };
+  updateHint(hints[mode], 'active');
+}
+
+function advanceMeasureMode() {
+  if (measureMode==='MLD') setMeasureMode('RD');
+  else if (measureMode==='RD') setMeasureMode('L');
+  else {
+    measureMode = null;
+    ['MLD','RD','L'].forEach(m => document.getElementById('btn'+m).classList.remove('active'));
+    updateHint('✓ Misure completate — verifica i valori e calcola', '');
+  }
+}
+
+function resetAll() {
+  measurements = { MLD:null, RD:null, L:null };
+  calibrationMode = false;
+  if (img) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ['mldInput','rdInput','lInput'].forEach(id => { document.getElementById(id).value=''; });
+  ['mldWrap','rdWrap','lWrap'].forEach(id => document.getElementById(id).classList.remove('ai-filled'));
+  ['mldTag','rdTag','lTag'].forEach(id => document.getElementById(id).textContent='');
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('aiAnalysisCard').classList.remove('visible');
+  document.getElementById('calcBtn').disabled = true;
+  updateStatus(false);
+  setMeasureMode('MLD');
+  showToast('Reset completato');
+}
+
+// ═══════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════
+function updateMeasureInputs() {
+  const ppm = pixelsPerMm || estimateScale();
+  if (measurements.MLD) document.getElementById('mldInput').value = (measurements.MLD.pxLen/ppm).toFixed(2);
+  if (measurements.RD)  document.getElementById('rdInput').value  = (measurements.RD.pxLen/ppm).toFixed(2);
+  if (measurements.L)   document.getElementById('lInput').value   = (measurements.L.pxLen/ppm).toFixed(1);
+  onParamChange();
+}
+
+function estimateScale() { return canvas.width / 40; }
+
+function onParamChange() {
+  const mld=parseFloat(document.getElementById('mldInput').value);
+  const rd=parseFloat(document.getElementById('rdInput').value);
+  const l=parseFloat(document.getElementById('lInput').value);
+  const valid = mld>0&&rd>0&&l>0&&mld<=rd;
+  document.getElementById('calcBtn').disabled = !valid;
+  updateStatus(valid);
+}
+
+function updateStatus(ok) {
+  document.getElementById('statusDot').className = 'status-dot' + (ok?' ok':'');
+  document.getElementById('statusText').textContent = ok ? 'Pronto per il calcolo' : 'In attesa';
+}
+
+// ═══════════════════════════════════════════════
+// mFR CALCULATION
+// ═══════════════════════════════════════════════
+function calculateMFR() {
+  const mld=parseFloat(document.getElementById('mldInput').value);
+  const rd=parseFloat(document.getElementById('rdInput').value);
+  const l=parseFloat(document.getElementById('lInput').value);
+  if (!mld||!rd||!l) return;
+  if (mld>rd) { showToast('Errore: MLD > RD'); return; }
+  const mfr = Math.min(Math.max(Math.pow(mld/rd,2)/(1+0.5*l/rd), 0.40), 1.00);
+  displayResult(mfr, mld, rd, l);
+  // Auto-save to session
+  const vessel = document.querySelector('#aiAnalysisBody .ai-finding-val')?.textContent?.trim()?.split('\n')[0] || 'Vaso';
+  saveSession(mfr, mld.toFixed(2), rd.toFixed(2), l.toFixed(1), vessel);
+}
+
+function displayResult(mfr, mld, rd, l) {
+  document.getElementById('resultCard').classList.add('visible');
+  const val=document.getElementById('resultValue');
+  const interp=document.getElementById('resultInterp');
+  val.textContent = mfr.toFixed(2);
+  let color,bg,label,subtext;
+  if (mfr<=0.75)      { color='#ff6b35'; bg='rgba(255,107,53,0.1)';  label='Stenosi emodinamicamente significativa'; subtext='mFR ≤ 0.75 → rivascolarizzazione indicata'; }
+  else if (mfr<=0.80) { color='#ffcc02'; bg='rgba(255,204,2,0.1)';   label='Zona grigia — valutare con FFR/iFR';     subtext='0.75 < mFR ≤ 0.80 → zona borderline'; }
+  else                { color='#00c97a'; bg='rgba(0,201,122,0.1)';   label='Stenosi non significativa';              subtext='mFR > 0.80 → terapia medica ottimale'; }
+  val.style.color=color;
+  interp.style.background=bg;
+  document.getElementById('interpDot').style.cssText=`background:${color};box-shadow:0 0 6px ${color}`;
+  document.getElementById('interpText').textContent=label; document.getElementById('interpText').style.color=color;
+  document.getElementById('resultSub').textContent=subtext;
+  const gPos=Math.max(0,Math.min(100,(mfr-0.50)/0.50*100));
+  document.getElementById('gaugeFill').style.width=gPos+'%';
+  document.getElementById('gaugeMarker').style.cssText=`left:${gPos}%;background:${color}`;
+  const ds=((1-mld/rd)*100).toFixed(1);
+  const as=((1-Math.pow(mld/rd,2))*100).toFixed(1);
+  document.getElementById('detailDS').textContent=ds+'%';
+  document.getElementById('detailAS').textContent=as+'%';
+  document.getElementById('detailClass').textContent=parseFloat(ds)<50?'Lieve':parseFloat(ds)<70?'Intermedia':'Severa';
+}
+
+// ═══════════════════════════════════════════════
+// MULTI-VESSEL SESSION MANAGEMENT
+// ═══════════════════════════════════════════════
+function saveSession(mfr, mld, rd, l, vesselName) {
+  const id = Date.now();
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = 80; thumbCanvas.height = 60;
+  thumbCanvas.getContext('2d').drawImage(canvas, 0, 0, 80, 60);
+  const thumb = thumbCanvas.toDataURL('image/jpeg', 0.5);
+
+  const mfrColor = mfr <= 0.75 ? '#ff6b35' : mfr <= 0.80 ? '#ffcc02' : '#00c97a';
+  sessions.push({ id, mfr, mld, rd, l, vesselName: vesselName || 'Vaso', thumb, mfrColor });
+  currentSessionId = id;
+  renderSessions();
+}
+
+function renderSessions() {
+  if (sessions.length === 0) return;
+  const list = document.getElementById('sessionList');
+  const items = document.getElementById('sessionItems');
+  list.style.display = 'block';
+  items.innerHTML = sessions.map(s => `
+    <div class="session-card ${s.id === currentSessionId ? 'active-session' : ''}" id="sess_${s.id}">
+      <img class="session-thumb" src="${s.thumb}" alt="">
+      <div class="session-info">
+        <strong>${s.vesselName}</strong>
+        <small>MLD ${s.mld}mm · RD ${s.rd}mm · L ${s.l}mm</small>
+      </div>
+      <div class="session-mfr" style="color:${s.mfrColor}">${s.mfr.toFixed(2)}</div>
+      <button class="session-del" onclick="deleteSession(${s.id})" title="Elimina">✕</button>
+    </div>
+  `).join('');
+}
+
+function deleteSession(id) {
+  sessions = sessions.filter(s => s.id !== id);
+  if (sessions.length === 0) document.getElementById('sessionList').style.display = 'none';
+  else renderSessions();
+}
+
+function newAngio() {
+  // Save current result if available
+  const mfr = parseFloat(document.getElementById('resultValue').textContent);
+  if (!isNaN(mfr) && mfr > 0) {
+    const mld = parseFloat(document.getElementById('mldInput').value);
+    const rd = parseFloat(document.getElementById('rdInput').value);
+    const l = parseFloat(document.getElementById('lInput').value);
+    const vessel = document.querySelector('#aiAnalysisBody .ai-finding-val')?.textContent?.split('\n')[0]?.trim() || 'Vaso';
+    saveSession(mfr, mld, rd, l, vessel);
+    showToast('Sessione salvata — carica la nuova angiografia');
+  } else {
+    showToast('Nessun risultato da salvare — carica prima un\'immagine e calcola');
+  }
+  // Reset for new image
+  measurements = { MLD:null, RD:null, L:null };
+  calibrationMode = false;
+  img = null; imgBase64 = null;
+  ['mldInput','rdInput','lInput'].forEach(id => document.getElementById(id).value='');
+  ['mldWrap','rdWrap','lWrap'].forEach(id => document.getElementById(id).classList.remove('ai-filled'));
+  ['mldTag','rdTag','lTag'].forEach(id => document.getElementById(id).textContent='');
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('aiAnalysisCard').classList.remove('visible');
+  document.getElementById('calcBtn').disabled = true;
+  document.getElementById('imageContainer').classList.remove('visible');
+  document.getElementById('uploadZone').style.display = '';
+  document.getElementById('fileInput').value = '';
+  updateStatus(false);
+  setMeasureMode('MLD');
+}
+
+// ═══════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════
+function showAIOverlay(text) {
+  document.getElementById('aiOverlayText').innerHTML = text.replace('\n','<br>');
+  document.getElementById('aiOverlay').classList.add('visible');
+}
+function hideAIOverlay() { document.getElementById('aiOverlay').classList.remove('visible'); }
+
+function setCalibStatus(type, text) {
+  const el = document.getElementById('calibStatus');
+  el.className = 'calib-status ' + type;
+  el.innerHTML = `<div class="calib-dot"></div><span>${text}</span>`;
+}
+
+function updateHint(text, cls) {
+  const h = document.getElementById('measureHint');
+  h.textContent = text;
+  h.className = 'measure-hint' + (cls ? ' '+cls : '');
+}
+
+function toggleFormula() {
+  document.getElementById('formulaContent').classList.toggle('open');
+  document.getElementById('formulaArrow').textContent = document.getElementById('formulaContent').classList.contains('open') ? '▾' : '▸';
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
